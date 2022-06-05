@@ -43,6 +43,10 @@ public class Constants {
      * Use the non-clairvoyant scheduler.
      */
     DARK,
+    /**
+     * Round-Robin
+     */
+    RR
   }
 
   /**
@@ -74,7 +78,7 @@ public class Constants {
   /**
    * Capacity constraint of a rack in Bps.
    */
-  public static final double RACK_BYTES_PER_SEC = RACK_BITS_PER_SEC / 8.0;
+  public static final double RACK_BYTES_PER_SEC = RACK_BITS_PER_SEC / 8.0; //128MB
 
   /**
    * Number of milliseconds in a second of {@link Simulator}.
@@ -86,7 +90,7 @@ public class Constants {
    * Time step of {@link Simulator#simulate(int)}.
    */
   public static final int SIMULATION_QUANTA = SIMULATION_SECOND_MILLIS
-      / (int) (RACK_BYTES_PER_SEC / 1048576);
+      / (int) (RACK_BYTES_PER_SEC / 1048576); //8
 
   /**
    * {@link Simulator#simulate(int)} completes after this time.

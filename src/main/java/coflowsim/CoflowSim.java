@@ -14,11 +14,11 @@ import coflowsim.utils.Constants.SHARING_ALGO;
 public class CoflowSim {
 
   public static void main(String[] args) {
-    
+    /*
     for(int i = 0; i < args.length; i++) {
       System.out.println(args[i]);
     }
-    
+    */
     int curArg = 0;
 
     SHARING_ALGO sharingAlgo = SHARING_ALGO.FAIR;
@@ -41,13 +41,13 @@ public class CoflowSim {
         sharingAlgo = SHARING_ALGO.SEBF;
       } else if (UPPER_ARG.contains("DARK")) {
         sharingAlgo = SHARING_ALGO.DARK;
-      } else {
+      } else if (UPPER_ARG.contains("RR")){ //tested algo
+        sharingAlgo = SHARING_ALGO.RR;
+      }else {
         System.err.println("Unsupported or Wrong Sharing Algorithm");
         System.exit(1);
       }
     }
-    
-    System.out.println("algo selected done");
 
     boolean isOffline = false;
     int simulationTimestep = 10 * Constants.SIMULATION_SECOND_MILLIS;
@@ -60,8 +60,6 @@ public class CoflowSim {
     if (considerDeadline && args.length > curArg) {
       deadlineMultRandomFactor = Double.parseDouble(args[curArg++]);
     }
-
-    System.out.println("Deadline function not used");
 
     // Create TraceProducer
     TraceProducer traceProducer = null;
@@ -130,5 +128,10 @@ public class CoflowSim {
 
     nlpl.simulate(simulationTimestep);
     nlpl.printStats(true);
+    /* System.out.println(j.jobName + " " + j.simulatedStartTime + " " + j.simulatedFinishTime
+    *      + " " + j.numMappers + " " + j.numReducers + " " + j.totalShuffleBytes + " "
+    *       + j.maxShuffleBytes + " " + jDur + " " + Math.round(j.deadlineDuration) + " "
+    *       + j.simulatedShuffleIndividualSums);
+    */
   }
 }

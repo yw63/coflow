@@ -22,6 +22,7 @@ import coflowsim.utils.Utils;
 public class CoflowSimulator extends Simulator {
 
   Vector<Job> sortedJobs;
+  int rrpt = 0;
 
   double[] sendBpsFree;
   double[] recvBpsFree;
@@ -96,14 +97,21 @@ public class CoflowSimulator extends Simulator {
   /** {@inheritDoc} */
   @Override
   protected void afterJobAdmission(long curTime) {
-    layoutFlowsInJobOrder();
+    layoutFlowsInJobOrder(); //add flows to flowinRacks[NUM_RACKS] according to the sortedjobs<>
     updateRatesDynamicAlpha(curTime, false);
   }
 
   /** {@inheritDoc} */
   @Override
   protected void onSchedule(long curTime) {
-    proceedFlowsInAllRacks(curTime, Constants.SIMULATION_QUANTA);
+    if (sharingAlgo == SHARING_ALGO.RR){
+      proceedFlowsInAllRacksRR(curTime, Constants.SIMULATION_QUANTA);
+      updaterr();
+    }
+    else
+      proceedFlowsInAllRacks(curTime, Constants.SIMULATION_QUANTA);
+
+    return;
   }
 
   /** {@inheritDoc} */
@@ -188,6 +196,11 @@ public class CoflowSimulator extends Simulator {
       Arrays.fill(recvUsed, 0.0);
 
       double currentAlpha = calcAlphaOnline(sj, sendBpsFree, recvBpsFree);
+      System.out.println(sj.jobName);
+      System.out.println("currentalpha before adjusting = " + currentAlpha);
+      if(sharingAlgo == SHARING_ALGO.RR)
+        currentAlpha = 1.0;
+      System.out.println("currentalpha after adjusting= " + currentAlpha);
       if (currentAlpha == Constants.VALUE_UNKNOWN) {
         skippedJobs.add(sj);
         continue;
@@ -412,7 +425,7 @@ public class CoflowSimulator extends Simulator {
       return;
     }
 
-    if (sharingAlgo == SHARING_ALGO.FIFO) {
+    if (sharingAlgo == SHARING_ALGO.FIFO || sharingAlgo == SHARING_ALGO.RR) {
       sortedJobs.add(j);
     } else {
       int index = 0;
@@ -482,6 +495,62 @@ public class CoflowSimulator extends Simulator {
     }
   }
 
+  private void proceedFlowsInAllRacksRR(long curTime, long quantaSize) {
+    for (int i = 0; i < NUM_RACKS; i++) {
+      double totalBytesMoved = 0;
+      Vector<Flow> flowsToRemove = new Vector<Flow>();
+      for (Flow f : flowsInRacks[i]) {
+        ReduceTask rt = f.reducer;
+    
+        //check if the current reducer task belongs to the right job in RR
+        if(rt.parentJob != sortedJobs.elementAt(rrpt))
+          continue;
+
+        if (totalBytesMoved >= Constants.RACK_BYTES_PER_SEC) {
+          break;
+        }
+
+        double bytesPerTask = (f.currentBps / 8)
+            * (1.0 * quantaSize / Constants.SIMULATION_SECOND_MILLIS);
+        bytesPerTask = Math.min(bytesPerTask, f.bytesRemaining);
+
+        f.bytesRemaining -= bytesPerTask;
+        if (f.bytesRemaining <= Constants.ZERO) {
+          rt.flows.remove(f);
+          flowsToRemove.add(f);
+
+          // Give back to src and dst links
+          sendBpsFree[f.mapper.taskID] += f.currentBps;
+          recvBpsFree[f.reducer.taskID] += f.currentBps;
+        }
+
+        totalBytesMoved += bytesPerTask;
+        rt.shuffleBytesLeft -= bytesPerTask;
+        rt.parentJob.decreaseShuffleBytesPerRack(rt.taskID, bytesPerTask);
+        rt.parentJob.shuffleBytesCompleted += bytesPerTask;
+
+        // If no bytes remaining, mark end and mark for removal
+        if ((rt.shuffleBytesLeft <= Constants.ZERO || rt.flows.size() == 0) && !rt.isCompleted()) {
+          rt.cleanupTask(curTime + quantaSize);
+          if (!rt.parentJob.jobActive) {
+            removeDeadJob(rt.parentJob);
+          }
+          decNumActiveTasks();
+        }
+      }
+      flowsInRacks[i].removeAll(flowsToRemove);
+    }
+  }
+
+  private void updaterr(){
+    if (rrpt+1 > sortedJobs.size()-1)
+      rrpt = 0;
+    else
+      rrpt++;
+
+    return;
+  }
+
   protected void layoutFlowsInJobOrder() {
     for (int i = 0; i < NUM_RACKS; i++) {
       flowsInRacks[i].clear();
@@ -502,6 +571,36 @@ public class CoflowSimulator extends Simulator {
       }
     }
   }
+
+  /*
+  protected void layoutFlowsInRR() {
+    System.out.println("layoutFlowsInRR");
+    System.out.println("rrpt = " + rrpt);
+    for (int i = 0; i < NUM_RACKS; i++) {
+      flowsInRacks[i].clear();
+    }
+    Job job = sortedJobs.elementAt(rrpt); 
+    for (Task r : job.tasks) {
+      if (r.taskType != TaskType.REDUCER) {
+        continue;
+      }
+
+      ReduceTask rt = (ReduceTask) r;
+      if (rt.isCompleted()) {
+        continue;
+      }
+
+      flowsInRacks[r.taskID].addAll(rt.flows);
+    }
+
+    if(rrpt+1 > sortedJobs.size()-1)
+      rrpt = 0;
+    else
+      rrpt++;
+    
+    System.out.println("After flow layout, rrpt = " + rrpt + " sortedJobs.size() = " + sortedJobs.size());
+  }
+  */
 
   /**
    * Comparator used by {@link CoflowSimulator#addToSortedJobs(Job)} to add new job in list sorted

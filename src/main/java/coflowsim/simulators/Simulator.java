@@ -37,6 +37,8 @@ public abstract class Simulator {
 
   private int numActiveTasks = 0;
 
+  public Job curjob;
+
   /**
    * Constructor for Simulator.
    * 
@@ -157,8 +159,11 @@ public abstract class Simulator {
    *          simulator epoch length in milliseconds
    */
   public void simulate(int EPOCH_IN_MILLIS) {
+    //each epoch = 10240 milliseconds
+    //System.err.printf("epoch = %d\n", EPOCH_IN_MILLIS);
     int curJob = 0;
     int TOTAL_JOBS = jobs.size();
+    //System.out.println("Total jobs = " + TOTAL_JOBS);
 
     for (CURRENT_TIME = 0; CURRENT_TIME < Constants.SIMULATION_ENDTIME_MILLIS
         && (curJob < TOTAL_JOBS || numActiveTasks > 0); CURRENT_TIME += EPOCH_IN_MILLIS) {
@@ -203,7 +208,8 @@ public abstract class Simulator {
 
         // Print progress
         if (curTime % Constants.SIMULATION_SECOND_MILLIS == 0) {
-          System.err.printf("Timestep %6d: Running: %3d Started: %5d\n",
+          System.out.printf("Epoch %3d ", curTime / EPOCH_IN_MILLIS);
+          System.out.printf("Timestep %6d: Running: %3d Started: %5d\n",
               (curTime / Constants.SIMULATION_SECOND_MILLIS), numActiveJobs, curJob);
         }
 
@@ -262,6 +268,7 @@ public abstract class Simulator {
     int ignoreCount = 0;
     int metDeadlineCount = 0;
 
+    System.out.println("Name   StartTime   EndTime   Mappers   Reducers       Bytes         Max     Time");
     for (Job j : jobs) {
       if (ignoreThisJob(j)) {
         continue;
@@ -286,10 +293,15 @@ public abstract class Simulator {
       }
 
       if (doPrint) {
+        /*
         System.out.println(j.jobName + " " + j.simulatedStartTime + " " + j.simulatedFinishTime
-            + " " + j.numMappers + " " + j.numReducers + " " + j.totalShuffleBytes + " "
-            + j.maxShuffleBytes + " " + jDur + " " + Math.round(j.deadlineDuration) + " "
+            + " " + j.numMappers + " " + j.numReducers + " " + j.totalShuffleBytes/(1024*1024) + " "
+            + j.maxShuffleBytes/(1024*1024) + " " + jDur + " " + Math.round(j.deadlineDuration) + " "
             + j.simulatedShuffleIndividualSums);
+        */
+        System.out.printf("%s %10.1f %9.1f %9d %10d %11.1f %11.1f %8.1f\n", j.jobName, j.simulatedStartTime, j.simulatedFinishTime, 
+                                                                                j.numMappers, j.numReducers, j.totalShuffleBytes/(1024*1024),
+                                                                                j.maxShuffleBytes/(1024*1024), jDur);
       }
     }
 
